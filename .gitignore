@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+database/
+config.ini
 # C extensions
 *.so
 
