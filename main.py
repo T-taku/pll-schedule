@@ -5,11 +5,8 @@ from discord.ext import commands, tasks
 from typing import Union
 from discord.commands import Option
 import datetime
-import calendar
 import time as timetime
-import aiocron
 import sqlite3
-from discord.ext.ui import View, Message, Select, SelectOption, ViewTracker, MessageProvider
 from typing import List
 import asyncio
 
@@ -72,17 +69,19 @@ async def create(
     embed.add_field(name="メッセージ内容",value=f"{plan_msg}",inline=True)
     await ctx.respond(embed=embed)
 
-def get_plan(bot):
+async def get_plan(ctx: discord.AutocompleteContext):
+    bot.conn.commit()
     options=[]
     bot.cur.execute("SELECT * FROM plan;")
     for p in bot.cur.fetchall():
+        print(f"{p[0]}")
         options.append(f"{p[0]}")
     return options
 
 @bot.slash_command(guild_ids=[858610234132922389])
 async def edit(
     ctx,
-    plan: Option(str, "予定を選択してください。", choices=get_plan(bot)),
+    plan: Option(str, "予定を選択してください。", autocomplete=get_plan),
     plan_name: Option(str, "予定の名前"),
     date: Option(str, "日付(例:2022/01/01) ※半角数字のみ、1などの単数は01と入力"),
     plan_msg: Option(str, "メッセージ(メンションも含めます。)"),
@@ -95,7 +94,7 @@ async def edit(
     else:
         hour, minutes=strptime(time)
     year, month, day=set_date(date)
-    bot.cur.execute("UPDATE plan SET name = ?, msg = ?, year = ?, month = ?, day = ?, hour = ?, minutes = ? WHERE name = ?", (plan_name,plan_msg,year,month,day,hour,minutes,plan,))
+    bot.cur.execute("UPDATE plan SET name = ?, msg = ?, year = ?, month = ?, day = ?, hour = ?, minutes = ? WHERE name = ?", (plan_name,plan_msg,year,month,day,hour,minutes,plan))
     bot.conn.commit()
     embed = discord.Embed(title="予定の変更完了", description="次のように予定の変更が完了しました。",color=0xFFEB3B)
     embed.add_field(name="予定の名前",value=f"{plan_name}",inline=True)
@@ -107,7 +106,7 @@ async def edit(
 @bot.slash_command(guild_ids=[858610234132922389], name="delete")
 async def delete_(
     ctx,
-    plan: Option(str, "予定を選択してください。", choices=get_plan(bot)),
+    plan: Option(str, "予定を選択してください。", autocomplete=get_plan),
     ):
     """予定の削除を行います。"""
     bot.cur.execute("DELETE FROM plan WHERE name = ?", (plan,))
@@ -133,13 +132,11 @@ async def send_notice():
     coros = []
     try:
         for i in bot.cur.fetchall():
-            title=i[0]
-            month=i[4]
-            day=i[5]
             embed = discord.Embed(title=i[0],color=0xFDD835, timestamp=datetime.datetime(*i[2:7]) - datetime.timedelta(hours=9)) # データベースにはJSTで入っているので9時間引いてる
-            coros.append(bot.get_channel(875560501449469982).send(i[1], embed=embed)) # メッセージを送信するコルーチンを生成して配列にぶち込む
-            bot.cur.execute("DELETE FROM plan WHERE name = ?, month = ?, day = ?", title,month,day,)
-            bot.cur.commit()
+            coros.append(bot.get_channel(875560501449469982).send(embed=embed)) # メッセージを送信するコルーチンを生成して配列にぶち込む
+            coros.append(bot.get_channel(875560501449469982).send(i[1]))
+            bot.cur.execute("DELETE FROM plan WHERE year <= ? AND month <= ? AND day <= ? AND hour <= ? AND minutes <= ?", sql_taple) # データくんは用済みなので消し消し
+            bot.conn.commit()
         loop = bot.loop or asyncio.get_event_loop()
         loop.run_until_complete(asyncio.gather(*coros)) # コルーチンを一気に実行するで
     except:
