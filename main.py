@@ -18,14 +18,12 @@ bot = discord.Bot()
 dbname = 'database/plan.db'
 bot.conn = sqlite3.connect(dbname)
 bot.cur = bot.conn.cursor()
-
 bot.cur.execute("CREATE TABLE IF NOT EXISTS plan(name, msg, year, month, day, hour, minutes)")
 bot.conn.commit()
 
 @bot.event
 async def on_ready():
     print("Login!")
-    # send_notice.start()
 
 def set_date(date):
     try:
@@ -78,7 +76,7 @@ def get_plan(bot):
     options=[]
     bot.cur.execute("SELECT * FROM plan;")
     for p in bot.cur.fetchall():
-        options.append(f"{p[2]}/{p[3]}/{p[4]} {p[5]}:{p[6]} - {p[0]}")
+        options.append(f"{p[0]}")
     return options
 
 @bot.slash_command(guild_ids=[858610234132922389])
@@ -112,9 +110,9 @@ async def delete_(
     plan: Option(str, "予定を選択してください。", choices=get_plan(bot)),
     ):
     """予定の削除を行います。"""
-    bot.cur.execute("DELETE FROM plan WHERE name <= ?", (plan,))
+    bot.cur.execute("DELETE FROM plan WHERE name = ?", (plan,))
     bot.conn.commit()
-    embed = discord.Embed(title="予定の削除完了", description=f"「{plan}」の削除が完了しました。",color=0x00FFFF)
+    embed = discord.Embed(title="予定の削除完了", description=f"「{plan}」の削除が完了しました。",color=0xF44336)
     await ctx.respond(embed=embed)
 
 @bot.slash_command(guild_ids=[858610234132922389], name="list")
@@ -126,21 +124,28 @@ async def list_(ctx):
         embed.add_field(name=i[0], value=f"{i[2]}/{i[3]}/{i[4]} {i[5]}:{i[6]}", inline=False)
     await ctx.respond(embed=embed)
 
-@tasks.loop(seconds=1)
+@tasks.loop(seconds=1.0)
 async def send_notice():
     JST = datetime.timezone(datetime.timedelta(hours=+9), "JST")
     now = datetime.datetime.now(JST) # JSTで現在時刻を取得(datetime型)
     sql_taple = (now.year, now.month, now.day, now.hour, now.minute)
-
     bot.cur.execute("SELECT * FROM plan WHERE year <= ? AND month <= ? AND day <= ? AND hour <= ? AND minutes <= ?", sql_taple) # 現在時刻とそれ以前のデータを全部取得
     coros = []
-    for i in bot.cur.fetchall():
-        embed = discord.Embed(title="予定の通知", description=i[0],color=0xFDD835, timestamp=datetime.datetime(*i[2:7]) - datetime.timedelta(hours=9)) # データベースにはJSTで入っているので9時間引いてる
-        coros.append(bot.get_channel(875560501449469982).send(i[1], embed=embed)) # メッセージを送信するコルーチンを生成して配列にぶち込む
-    loop = bot.loop or asyncio.get_event_loop()
-    loop.run_until_complete(asyncio.gather(*coros)) # コルーチンを一気に実行するで
+    try:
+        for i in bot.cur.fetchall():
+            title=i[0]
+            month=i[4]
+            day=i[5]
+            embed = discord.Embed(title=i[0],color=0xFDD835, timestamp=datetime.datetime(*i[2:7]) - datetime.timedelta(hours=9)) # データベースにはJSTで入っているので9時間引いてる
+            coros.append(bot.get_channel(875560501449469982).send(i[1], embed=embed)) # メッセージを送信するコルーチンを生成して配列にぶち込む
+            bot.cur.execute("DELETE FROM plan WHERE name = ?, month = ?, day = ?", title,month,day,)
+            bot.cur.commit()
+        loop = bot.loop or asyncio.get_event_loop()
+        loop.run_until_complete(asyncio.gather(*coros)) # コルーチンを一気に実行するで
+    except:
+        return
 
-    bot.cur.execute("DELETE FROM plan WHERE year <= ? AND month <= ? AND day <= ? AND hour <= ? AND minutes <= ?", sql_taple) # データくんは用済みなので消し消し
+send_notice.start()
 
 _close = bot.close
 async def close_handler():
