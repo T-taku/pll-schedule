@@ -1,3 +1,1 @@
 git+https://github.com/Pycord-Development/pycord
-aiocron
-git+https://github.com/sizumita/discord-ext-ui.git
