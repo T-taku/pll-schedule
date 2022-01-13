@@ -1,4 +1,4 @@
-# projectlittlelindo/pLL-scheduler
+# pLL-scheduler
 
 <div align="center">
 <img src="https://t-taku.app/img/pll-scheduler.png" alt="." title="pLL-scheduler">
@@ -14,6 +14,8 @@ This bot has supported Japanese only.  If you want to use in English please tell
 * Pycord 2.0 or above
 
 ## Installation
+
+Clone this repository.
 
 ```sh
 pip install -r requirements.txt
