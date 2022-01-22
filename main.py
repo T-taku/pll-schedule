@@ -14,7 +14,7 @@ bot = discord.Bot()
 def get_token(name):
     config = configparser.ConfigParser()
     config.read('config.ini')
-    tokens = 'tokens'
+    tokens = 'token'
     return config.get(tokens, name)
 
 dbname = 'database/plan.db'
